@@ -21,7 +21,7 @@ SAGE is built in three layers:
 Built on a 6-node home lab anchored by a Mac Mini M4 with 48GB RAM.
 
 ## Repository Structure
-
+```
 sage-homelab/
 ├── docs/                    # Architecture diagrams, ADRs, design decisions
 ├── blog/                    # Blog post drafts
@@ -31,6 +31,7 @@ sage-homelab/
 ├── synthetic-data/          # NeuralOps-Core synthetic load generator
 ├── control-plane-ui/        # Next.js dashboard
 └── scripts/                 # Health checks, teardown, reset utilities
+```
 
 ## Status
 
