@@ -1,0 +1,32 @@
+groups:
+  - name: sage.platform
+    interval: 30s
+    rules:
+
+      - alert: ContainerDown
+        expr: absent(container_last_seen{name=~".+"})
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Container missing from cAdvisor"
+          description: "A container has stopped reporting to cAdvisor for over 1 minute."
+
+      - alert: HighMemoryUsage
+        expr: |
+          (container_memory_usage_bytes{id=~"/docker/.+"} / container_spec_memory_limit_bytes{id=~"/docker/.+"}) > 0.85
+        for: 2m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Container memory usage above 85%"
+          description: "Container {{ $labels.id }} memory usage is {{ $value | humanizePercentage }}."
+
+      - alert: PrometheusTargetMissing
+        expr: up == 0
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Prometheus target is down"
+          description: "Target {{ $labels.job }} at {{ $labels.instance }} is not reachable."
