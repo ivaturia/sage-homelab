@@ -75,6 +75,34 @@ services:
     networks:
       - sage-network
 
+  jaeger:
+    image: jaegertracing/all-in-one:latest
+    container_name: jaeger
+    restart: always
+    ports:
+      - "16686:16686"
+      - "4317:4317"
+      - "4318:4318"
+    environment:
+      - COLLECTOR_OTLP_ENABLED=true
+    networks:
+      - sage-network
+
+  otel-collector:
+    image: otel/opentelemetry-collector-contrib:latest
+    container_name: otel-collector
+    restart: always
+    ports:
+      - "4319:4318"
+      - "4320:4317"
+      - "8889:8889"
+    volumes:
+      - ./otelcollector/otel-collector-config.yml:/etc/otelcol-contrib/config.yaml
+    depends_on:
+      - jaeger
+    networks:
+      - sage-network
+
 volumes:
   prometheus_data:
   grafana_data:
