@@ -14,12 +14,13 @@ BOLD='\033[1m'
 RESET='\033[0m'
 
 # ── Registered stacks (name:path pairs) ───────────────────────────────────────
-STACK_NAMES="portainer monitoring redpanda"
+STACK_NAMES="portainer monitoring redpanda infrastructure"
 stack_path() {
   case $1 in
     portainer)  echo "platform/portainer" ;;
     monitoring) echo "platform/monitoring" ;;
     redpanda)   echo "platform/redpanda" ;;
+    infrastructure) echo "infrastructure" ;;
     *)          echo "" ;;
   esac
 }
