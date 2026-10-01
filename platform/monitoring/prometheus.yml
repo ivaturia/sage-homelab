@@ -12,6 +12,8 @@ rule_files:
   - /etc/prometheus/alerts.yml
 
 scrape_configs:
+
+  # ── Monitoring stack ──────────────────────────────────────────
   - job_name: 'prometheus'
     static_configs:
       - targets: ['localhost:9090']
@@ -24,10 +26,31 @@ scrape_configs:
     static_configs:
       - targets: ['loki:3100']
 
+  - job_name: 'promtail'
+    static_configs:
+      - targets: ['promtail:9080']
+
   - job_name: 'alertmanager'
     static_configs:
       - targets: ['alertmanager:9093']
 
+  - job_name: 'grafana'
+    static_configs:
+      - targets: ['grafana:3000']
+
+  - job_name: 'jaeger'
+    static_configs:
+      - targets: ['jaeger:14269']   # admin port, serves /metrics
+
+  # Pending: otel-collector (needs telemetry exposed, file 10)
+
+  # ── Event bus ─────────────────────────────────────────────────
+  - job_name: 'redpanda'
+    metrics_path: /public_metrics
+    static_configs:
+      - targets: ['redpanda:9644']  # admin API port inside sage-network
+
+  # ── Data layer ────────────────────────────────────────────────
   - job_name: 'postgres'
     static_configs:
       - targets: ['sage-postgres-exporter:9187']
@@ -35,3 +58,5 @@ scrape_configs:
   - job_name: 'redis'
     static_configs:
       - targets: ['sage-redis-exporter:9121']
+
+  # Pending: minio (metrics endpoint requires auth; follow-up)
