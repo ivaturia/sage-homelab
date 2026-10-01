@@ -15,13 +15,15 @@ services:
       - --advertise-rpc-addr redpanda:33145
       - --mode dev-container
       - --smp 2
-      - --memory 1G
+      - --memory 1G          # 512M causes OOM on startup on the Mac Mini M4
       - --default-log-level=warn
+    # Nothing here has authentication yet, so every port is Mac-only.
+    # Containers reach Redpanda over sage-network (redpanda:9092, redpanda:9644).
     ports:
-      - "19092:19092"
-      - "18082:18082"
-      - "18081:18081"
-      - "19644:9644"
+      - "127.0.0.1:19092:19092"   # Kafka API (host clients)
+      - "127.0.0.1:18082:18082"   # HTTP Proxy
+      - "127.0.0.1:18081:18081"   # Schema Registry
+      - "127.0.0.1:19644:9644"    # Admin API
     volumes:
       - redpanda_data:/var/lib/redpanda/data
     networks:
@@ -37,7 +39,7 @@ services:
     container_name: redpanda-console
     restart: always
     ports:
-      - "8090:8080"
+      - "127.0.0.1:8090:8080"     # no login: Mac-only
     environment:
       - KAFKA_BROKERS=redpanda:9092
     depends_on:
