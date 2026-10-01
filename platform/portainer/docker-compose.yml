@@ -4,9 +4,11 @@ services:
     container_name: portainer
     restart: always
     ports:
-      - "9000:9000"
-      - "9443:9443"
+      - "127.0.0.1:9000:9000"   # HTTP: Mac-only (a login here would cross the LAN unencrypted)
+      - "9443:9443"             # HTTPS with login: LAN (self-signed cert until Traefik, Step 10)
     volumes:
+      # Docker socket = full control of Docker. Portainer's admin password
+      # effectively controls the whole platform: keep it strong.
       - /var/run/docker.sock:/var/run/docker.sock
       - portainer_data:/data
     networks:
