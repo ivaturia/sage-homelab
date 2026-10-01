@@ -5,18 +5,21 @@ services:
     container_name: sage-postgres
     restart: unless-stopped
     environment:
-      POSTGRES_USER: master
-      POSTGRES_PASSWORD: master_dev_password
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
       POSTGRES_DB: postgres
+      # Read by the init script on first start only (see file 5)
+      POSTGRES_SAGE_USER: ${POSTGRES_SAGE_USER}
+      POSTGRES_SAGE_PASSWORD: ${POSTGRES_SAGE_PASSWORD}
     volumes:
       - postgres_data:/var/lib/postgresql/data
       - ./postgres-init.sql:/docker-entrypoint-initdb.d/init.sql:ro
     ports:
-      - "5432:5432"
+      - "127.0.0.1:5432:5432"
     networks:
       - sage-network
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U master"]
+      test: ["CMD-SHELL", "pg_isready -U $$POSTGRES_USER -d postgres"]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -25,15 +28,24 @@ services:
     image: redis:7-alpine
     container_name: sage-redis
     restart: unless-stopped
-    command: redis-server --appendonly yes --maxmemory 512mb --maxmemory-policy allkeys-lru
+    command: >
+      redis-server
+      --appendonly yes
+      --maxmemory 512mb
+      --maxmemory-policy allkeys-lru
+      --requirepass ${REDIS_PASSWORD}
+    environment:
+      # redis-cli reads this automatically, so the healthcheck can authenticate
+      REDISCLI_AUTH: ${REDIS_PASSWORD}
     volumes:
       - redis_data:/data
     ports:
-      - "6379:6379"
+      - "127.0.0.1:6379:6379"
     networks:
       - sage-network
     healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
+      # grep for PONG: an auth failure still exits 0, so the exit code alone lies
+      test: ["CMD-SHELL", "redis-cli ping | grep -q PONG"]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -44,13 +56,13 @@ services:
     restart: unless-stopped
     command: server /data --console-address ":9002"
     environment:
-      MINIO_ROOT_USER: sage_admin
-      MINIO_ROOT_PASSWORD: sage_dev_password
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD}
     volumes:
       - minio_data:/data
     ports:
-      - "9001:9000"
-      - "9002:9002"
+      - "127.0.0.1:9001:9000"   # S3 API: local only
+      - "9002:9002"             # Web console: reachable on the LAN until Traefik (Step 10)
     networks:
       - sage-network
     healthcheck:
@@ -64,9 +76,10 @@ services:
     container_name: sage-postgres-exporter
     restart: unless-stopped
     environment:
-      DATA_SOURCE_NAME: "postgresql://master:master_dev_password@postgres:5432/postgres?sslmode=disable"
-    ports:
-      - "9187:9187"
+      DATA_SOURCE_URI: "postgres:5432/postgres?sslmode=disable"
+      DATA_SOURCE_USER: ${POSTGRES_USER}
+      DATA_SOURCE_PASS: ${POSTGRES_PASSWORD}
+    # No host port: Prometheus scrapes it over sage-network
     networks:
       - sage-network
     depends_on:
@@ -79,8 +92,8 @@ services:
     restart: unless-stopped
     environment:
       REDIS_ADDR: "redis://redis:6379"
-    ports:
-      - "9121:9121"
+      REDIS_PASSWORD: ${REDIS_PASSWORD}
+    # No host port: Prometheus scrapes it over sage-network
     networks:
       - sage-network
     depends_on:
