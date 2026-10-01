@@ -7,25 +7,37 @@ receivers:
         endpoint: 0.0.0.0:4318
 
 processors:
-  batch:
-    timeout: 1s
-    send_batch_size: 1024
-
+  # memory_limiter goes FIRST: it protects the collector before anything buffers data
   memory_limiter:
     check_interval: 1s
     limit_mib: 512
     spike_limit_mib: 128
 
+  batch:
+    timeout: 1s
+    send_batch_size: 1024
+
 exporters:
   otlp_grpc/jaeger:
     endpoint: jaeger:4317
     tls:
-      insecure: true
+      insecure: true    # plain gRPC inside sage-network; TLS arrives with Traefik/Vault PKI
 
   debug:
     verbosity: basic
 
 service:
+  # The collector's own metrics, for Prometheus. Published on all interfaces
+  # INSIDE the container; no host port is mapped, so it stays on sage-network.
+  telemetry:
+    metrics:
+      readers:
+        - pull:
+            exporter:
+              prometheus:
+                host: 0.0.0.0
+                port: 8888
+
   pipelines:
     traces:
       receivers: [otlp]
