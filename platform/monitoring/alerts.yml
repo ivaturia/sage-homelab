@@ -3,30 +3,76 @@ groups:
     interval: 30s
     rules:
 
-      - alert: ContainerDown
-        expr: absent(container_last_seen{name=~".+"})
-        for: 1m
-        labels:
-          severity: critical
-        annotations:
-          summary: "Container missing from cAdvisor"
-          description: "A container has stopped reporting to cAdvisor for over 1 minute."
-
-      - alert: HighMemoryUsage
-        expr: |
-          (container_memory_usage_bytes{id=~"/docker/.+"} / container_spec_memory_limit_bytes{id=~"/docker/.+"}) > 0.85
-        for: 2m
-        labels:
-          severity: warning
-        annotations:
-          summary: "Container memory usage above 85%"
-          description: "Container {{ $labels.id }} memory usage is {{ $value | humanizePercentage }}."
-
+      # Primary "service down" signal: every service with metrics is a scrape target.
       - alert: PrometheusTargetMissing
         expr: up == 0
         for: 1m
         labels:
           severity: critical
         annotations:
-          summary: "Prometheus target is down"
-          description: "Target {{ $labels.job }} at {{ $labels.instance }} is not reachable."
+          summary: "Target {{ $labels.job }} is down"
+          description: "Prometheus has not reached {{ $labels.job }} at {{ $labels.instance }} for over 1 minute."
+
+     # A Compose-managed container has stopped reporting.
+      # cAdvisor timestamps its own samples, so a stopped container's last value stays
+      # visible for Prometheus's 5-minute lookback. Two halves cover the whole outage:
+      #   1) first ~5 min: its freshest sample is older than 60s
+      #   2) after that:   seen in the last hour, absent now
+      # min/max "by (name)" means a recreate (new ID, same name) never looks like a death.
+      # Only evaluated while cAdvisor is up, so a blind watcher does not report everything down.
+      - alert: ContainerDown
+        expr: |
+          (
+            min by (name) (time() - container_last_seen{container_label_com_docker_compose_project!=""}) > 60
+            or
+            (
+              max by (name) (max_over_time(container_last_seen{container_label_com_docker_compose_project!=""}[1h]))
+              unless
+              max by (name) (container_last_seen{container_label_com_docker_compose_project!=""})
+            )
+          )
+          and on() (up{job="cadvisor"} == 1)
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Container {{ $labels.name }} is down"
+          description: "{{ $labels.name }} has stopped reporting. If it was removed on purpose, this resolves after an hour (or silence it in Alertmanager)."
+
+       # Crash loop: the container keeps restarting while still looking "Up" from afar.
+      # A restart resets its CPU counter to zero; resets() counts those drops.
+      # (container_start_time_seconds is the CREATION time; it never changes on restart.)
+      - alert: ContainerRestarting
+        expr: |
+          max by (name) (
+            resets(container_cpu_usage_seconds_total{container_label_com_docker_compose_project!=""}[15m])
+          ) >= 2
+        labels:
+          severity: warning
+        annotations:
+          summary: "Container {{ $labels.name }} is restarting repeatedly"
+          description: "{{ $labels.name }} restarted {{ $value }} times in the last 15 minutes. Check its logs in Loki."
+
+      # Only containers WITH a memory limit; unlimited ones report a limit of 0.
+      # Working set = memory the kernel considers when deciding to kill a container.
+      - alert: ContainerNearMemoryLimit
+        expr: |
+          container_memory_working_set_bytes{name!=""}
+            / (container_spec_memory_limit_bytes{name!=""} > 0)
+            > 0.85
+        for: 2m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Container {{ $labels.name }} is above 85% of its memory limit"
+          description: "{{ $labels.name }} is using {{ $value | humanizePercentage }} of its memory limit."
+
+      # All containers share the Docker Desktop VM's memory (about 8 GB today).
+      - alert: DockerVMMemoryHigh
+        expr: sum(container_memory_working_set_bytes{name!=""}) / max(machine_memory_bytes) > 0.85
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Containers are using over 85% of the Docker VM's memory"
+          description: "{{ $value | humanizePercentage }} of Docker Desktop's memory is in use. Containers may start being killed."
