@@ -4,6 +4,8 @@
 # Usage: ./sage.sh [up|down|status|logs] [stack_name] [service_name]
 
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+ENV_FILE="$REPO_ROOT/.env"
+NETWORK_NAME="sage-network"
 
 # ── Colours ───────────────────────────────────────────────────────────────────
 GREEN='\033[0;32m'
@@ -13,15 +15,16 @@ CYAN='\033[0;36m'
 BOLD='\033[1m'
 RESET='\033[0m'
 
-# ── Registered stacks (name:path pairs) ───────────────────────────────────────
+# ── Registered stacks ─────────────────────────────────────────────────────────
+# Case statement, not an associative array: macOS ships bash 3 (no declare -A)
 STACK_NAMES="portainer monitoring redpanda infrastructure"
 stack_path() {
   case $1 in
-    portainer)  echo "platform/portainer" ;;
-    monitoring) echo "platform/monitoring" ;;
-    redpanda)   echo "platform/redpanda" ;;
+    portainer)      echo "platform/portainer" ;;
+    monitoring)     echo "platform/monitoring" ;;
+    redpanda)       echo "platform/redpanda" ;;
     infrastructure) echo "infrastructure" ;;
-    *)          echo "" ;;
+    *)              echo "" ;;
   esac
 }
 
@@ -32,63 +35,103 @@ print_header() {
   echo -e "${BOLD}${CYAN}╚══════════════════════════════════════╝${RESET}\n"
 }
 
+# Run docker compose for one stack, always with the shared root .env
+compose() {
+  local name=$1
+  shift
+  docker compose --env-file "$ENV_FILE" \
+    -f "$REPO_ROOT/$(stack_path "$name")/docker-compose.yml" "$@"
+}
+
+# Stop early, with one clear message, if the basics are missing
+preflight() {
+  if ! docker info >/dev/null 2>&1; then
+    echo -e "${RED}✘ Docker is not running.${RESET} Start it with: open -a Docker"
+    exit 1
+  fi
+  if [ ! -f "$ENV_FILE" ]; then
+    echo -e "${RED}✘ Missing .env file.${RESET} Create it with: cp .env.example .env"
+    echo -e "  Then replace every change-me value (see comments in .env.example)."
+    exit 1
+  fi
+}
+
+# Every stack joins sage-network; create it on a fresh machine
+ensure_network() {
+  if ! docker network inspect "$NETWORK_NAME" >/dev/null 2>&1; then
+    echo -e "${CYAN}▶ Creating network: ${BOLD}$NETWORK_NAME${RESET}"
+    if ! docker network create "$NETWORK_NAME" >/dev/null; then
+      echo -e "${RED}✘ Could not create network $NETWORK_NAME${RESET}"
+      exit 1
+    fi
+  fi
+}
+
 stack_up() {
   local name=$1
-  local path="$REPO_ROOT/$(stack_path $name)"
   echo -e "${CYAN}▶ Starting stack: ${BOLD}$name${RESET}"
-  docker compose -f "$path/docker-compose.yml" up -d
-  echo -e "${GREEN}✔ $name up${RESET}\n"
+  if compose "$name" up -d; then
+    echo -e "${GREEN}✔ $name up${RESET}\n"
+  else
+    echo -e "${RED}✘ $name failed to start${RESET}\n"
+    return 1
+  fi
 }
 
 stack_down() {
   local name=$1
-  local path="$REPO_ROOT/$(stack_path $name)"
   echo -e "${YELLOW}▶ Stopping stack: ${BOLD}$name${RESET}"
-  docker compose -f "$path/docker-compose.yml" down
-  echo -e "${GREEN}✔ $name down${RESET}\n"
+  if compose "$name" down; then
+    echo -e "${GREEN}✔ $name down${RESET}\n"
+  else
+    echo -e "${RED}✘ $name failed to stop${RESET}\n"
+    return 1
+  fi
 }
 
 stack_status() {
   local name=$1
-  local path="$REPO_ROOT/$(stack_path $name)"
   echo -e "${BOLD}── $name ──────────────────────────────────${RESET}"
-  docker compose -f "$path/docker-compose.yml" ps --format "table {{.Name}}\t{{.Status}}\t{{.Ports}}"
+  compose "$name" ps --format "table {{.Name}}\t{{.Status}}\t{{.Ports}}"
   echo ""
-}
-
-stack_logs() {
-  local name=$1
-  local service=$2
-  local path="$REPO_ROOT/$(stack_path $name)"
-  if [ -z "$service" ]; then
-    docker compose -f "$path/docker-compose.yml" logs --tail 50 -f
-  else
-    docker compose -f "$path/docker-compose.yml" logs --tail 50 -f "$service"
-  fi
 }
 
 # ── Commands ──────────────────────────────────────────────────────────────────
 cmd_up() {
   print_header
+  preflight
+  ensure_network
   echo -e "${BOLD}Starting all SAGE stacks...${RESET}\n"
+  local failed=""
   for name in $STACK_NAMES; do
-    stack_up "$name"
+    stack_up "$name" || failed="$failed $name"
   done
+  if [ -n "$failed" ]; then
+    echo -e "${RED}${BOLD}✘ Failed stacks:${failed}${RESET}"
+    exit 1
+  fi
   echo -e "${GREEN}${BOLD}✔ All stacks started.${RESET}"
   cmd_status
 }
 
 cmd_down() {
   print_header
+  preflight
   echo -e "${BOLD}Stopping all SAGE stacks...${RESET}\n"
+  local failed=""
   for name in $STACK_NAMES; do
-    stack_down "$name"
+    stack_down "$name" || failed="$failed $name"
   done
+  if [ -n "$failed" ]; then
+    echo -e "${RED}${BOLD}✘ Failed stacks:${failed}${RESET}"
+    exit 1
+  fi
   echo -e "${GREEN}${BOLD}✔ All stacks stopped.${RESET}\n"
 }
 
 cmd_status() {
   print_header
+  preflight
   echo -e "${BOLD}Stack Status:${RESET}\n"
   for name in $STACK_NAMES; do
     stack_status "$name"
@@ -98,17 +141,17 @@ cmd_status() {
 cmd_logs() {
   local target=$1
   local service=$2
-  if [ -z "$target" ]; then
+  if [ -z "$target" ] || [ -z "$(stack_path "$target")" ]; then
     echo -e "${RED}Usage: ./sage.sh logs <stack_name> [service_name]${RESET}"
     echo -e "Available stacks: $STACK_NAMES"
     exit 1
   fi
-  if [ -z "$(stack_path $target)" ]; then
-    echo -e "${RED}Unknown stack: $target${RESET}"
-    echo -e "Available stacks: $STACK_NAMES"
-    exit 1
+  preflight
+  if [ -z "$service" ]; then
+    compose "$target" logs --tail 50 -f
+  else
+    compose "$target" logs --tail 50 -f "$service"
   fi
-  stack_logs "$target" "$service"
 }
 
 cmd_help() {
@@ -121,7 +164,7 @@ cmd_help() {
   echo -e ""
   echo -e "${BOLD}Available stacks:${RESET}"
   for name in $STACK_NAMES; do
-    echo -e "  ${CYAN}$name${RESET} → $(stack_path $name)"
+    echo -e "  ${CYAN}$name${RESET} → $(stack_path "$name")"
   done
   echo ""
 }
