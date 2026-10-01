@@ -1,0 +1,26 @@
+# Grafana datasources, provisioned from git.
+# UIDs match the originals so existing dashboards keep working. Do not change them.
+apiVersion: 1
+
+datasources:
+  - name: prometheus
+    uid: eflgvp270kh6oa
+    type: prometheus
+    access: proxy
+    url: http://prometheus:9090
+    isDefault: true
+    editable: false
+
+  - name: loki
+    uid: dflh0e5i9ivb4f
+    type: loki
+    access: proxy
+    url: http://loki:3100
+    editable: false
+
+  - name: jaeger
+    uid: bflh2s9p89la8f
+    type: jaeger
+    access: proxy
+    url: http://jaeger:16686
+    editable: false

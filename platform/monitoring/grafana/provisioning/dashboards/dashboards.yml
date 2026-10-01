@@ -1,0 +1,11 @@
+# Load every dashboard JSON file from /etc/grafana/dashboards (mounted from git).
+apiVersion: 1
+
+providers:
+  - name: sage
+    type: file
+    folder: ''               # General folder, where the dashboard already lives
+    disableDeletion: true
+    allowUiUpdates: false    # edit the JSON in git, not in the UI
+    options:
+      path: /etc/grafana/dashboards
