@@ -21,3 +21,5 @@ __pycache__/
 
 # Node (control plane UI, Phase 3)
 node_modules/
+# Secret files read by services (e.g. Alertmanager *_file settings)
+secrets/
