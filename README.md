@@ -20,7 +20,7 @@ SAGE is built in three layers:
 
 SAGE runs on a **single Mac Mini M4 with 48 GB RAM** (see [ADR-001](docs/architecture-decisions.md)).
 
-Note: on macOS, containers run inside Docker Desktop's Linux VM and share **only the memory assigned to that VM** (about 8 GB by default), not the Mac's full 48 GB. Adjust it in Docker Desktop → Settings → Resources.
+Note: on macOS, containers run inside Docker Desktop's Linux VM and share **only the memory assigned to that VM** (about 8 GB by default), not the Mac's full 48 GB. SAGE expects **16 GB** (ADR-008): Docker Desktop → Settings → Resources → Memory limit.
 
 ## Status
 
@@ -28,7 +28,7 @@ Note: on macOS, containers run inside Docker Desktop's Linux VM and share **only
 
 ## Quick start
 
-**Prerequisites:** Docker Desktop (set to start at login), git, openssl.
+**Prerequisites:** Docker Desktop (set to start at login, memory limit 16 GB), git, openssl.
 
 ```bash
 git clone https://github.com/ivaturia/sage-homelab.git

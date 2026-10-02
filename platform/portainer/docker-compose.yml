@@ -2,6 +2,7 @@ services:
   portainer:
     image: portainer/portainer-ce:2.39.2
     container_name: portainer
+    mem_limit: 256m
     restart: always
     ports:
       - "127.0.0.1:9000:9000"   # HTTP: Mac-only (a login here would cross the LAN unencrypted)

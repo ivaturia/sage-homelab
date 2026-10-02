@@ -1,0 +1,82 @@
+# Unit tests for alerts.yml. Run with:
+#   docker run --rm -v "$PWD/platform/monitoring:/w:ro" --entrypoint promtool \
+#     prom/prometheus:v3.11.3 test rules /w/tests/alert-rules.test.yml
+rule_files:
+  - ../alerts.yml
+
+evaluation_interval: 30s
+
+tests:
+  # 1. Container at 90% of its limit: pending at 1m, firing once "for: 2m" has passed
+  - interval: 30s
+    input_series:
+      - series: 'container_memory_working_set_bytes{name="busy"}'
+        values: '90x10'
+      - series: 'container_spec_memory_limit_bytes{name="busy"}'
+        values: '100x10'
+    alert_rule_test:
+      - eval_time: 1m
+        alertname: ContainerNearMemoryLimit
+        exp_alerts: []
+      - eval_time: 3m
+        alertname: ContainerNearMemoryLimit
+        exp_alerts:
+          - exp_labels:
+              severity: warning
+              name: busy
+            exp_annotations:
+              summary: "Container busy is above 85% of its memory limit"
+              description: "busy is using 90% of its memory limit."
+
+  # 2. Container at 50% of its limit: silent
+  # 3. Container with no limit (cAdvisor reports 0): silent, no divide-by-zero
+  - interval: 30s
+    input_series:
+      - series: 'container_memory_working_set_bytes{name="calm"}'
+        values: '50x10'
+      - series: 'container_spec_memory_limit_bytes{name="calm"}'
+        values: '100x10'
+      - series: 'container_memory_working_set_bytes{name="unlimited"}'
+        values: '90x10'
+      - series: 'container_spec_memory_limit_bytes{name="unlimited"}'
+        values: '0x10'
+    alert_rule_test:
+      - eval_time: 3m
+        alertname: ContainerNearMemoryLimit
+        exp_alerts: []
+
+  # 4. Containers use 90% of the Docker VM: pending at 4m, firing once "for: 5m" has passed
+  - interval: 30s
+    input_series:
+      - series: 'container_memory_working_set_bytes{name="a"}'
+        values: '50x15'
+      - series: 'container_memory_working_set_bytes{name="b"}'
+        values: '40x15'
+      - series: 'machine_memory_bytes{instance="cadvisor:8080"}'
+        values: '100x15'
+    alert_rule_test:
+      - eval_time: 4m
+        alertname: DockerVMMemoryHigh
+        exp_alerts: []
+      - eval_time: 6m
+        alertname: DockerVMMemoryHigh
+        exp_alerts:
+          - exp_labels:
+              severity: warning
+            exp_annotations:
+              summary: "Containers are using over 85% of the Docker VM's memory"
+              description: "90% of Docker Desktop's memory is in use. Containers may start being killed."
+
+  # 5. Containers use 50% of the Docker VM: silent
+  - interval: 30s
+    input_series:
+      - series: 'container_memory_working_set_bytes{name="a"}'
+        values: '30x15'
+      - series: 'container_memory_working_set_bytes{name="b"}'
+        values: '20x15'
+      - series: 'machine_memory_bytes{instance="cadvisor:8080"}'
+        values: '100x15'
+    alert_rule_test:
+      - eval_time: 6m
+        alertname: DockerVMMemoryHigh
+        exp_alerts: []

@@ -2,6 +2,7 @@ services:
   redpanda:
     image: redpandadata/redpanda:v26.1.9
     container_name: redpanda
+    mem_limit: 1536m
     restart: always
     command:
       - redpanda
@@ -37,6 +38,7 @@ services:
   redpanda-console:
     image: redpandadata/console@sha256:72bd99bdc304a7c6aab58bfaccf92e302d4e826f6f4737d14953eb04ceed7c07
     container_name: redpanda-console
+    mem_limit: 256m
     restart: always
     ports:
       - "127.0.0.1:8090:8080"     # no login: Mac-only

@@ -3,6 +3,7 @@ services:
   postgres:
     image: postgres:16.14-alpine
     container_name: sage-postgres
+    mem_limit: 512m
     restart: unless-stopped
     environment:
       POSTGRES_USER: ${POSTGRES_USER}
@@ -27,6 +28,7 @@ services:
   redis:
     image: redis:7.4.9-alpine
     container_name: sage-redis
+    mem_limit: 768m
     restart: unless-stopped
     command: >
       redis-server
@@ -53,6 +55,7 @@ services:
   seaweedfs:
     image: chrislusf/seaweedfs:4.48
     container_name: sage-seaweedfs
+    mem_limit: 1g
     restart: unless-stopped
     environment:
       S3_ACCESS_KEY: ${S3_ACCESS_KEY}
@@ -80,6 +83,7 @@ services:
   postgres-exporter:
     image: prometheuscommunity/postgres-exporter:v0.19.1
     container_name: sage-postgres-exporter
+    mem_limit: 128m
     restart: unless-stopped
     environment:
       DATA_SOURCE_URI: "postgres:5432/postgres?sslmode=disable"
@@ -95,6 +99,7 @@ services:
   redis-exporter:
     image: oliver006/redis_exporter:v1.84.0
     container_name: sage-redis-exporter
+    mem_limit: 128m
     restart: unless-stopped
     environment:
       REDIS_ADDR: "redis://redis:6379"

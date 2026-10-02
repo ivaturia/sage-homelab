@@ -104,3 +104,22 @@ On macOS, containers run inside Docker Desktop's Linux VM and share only that VM
 **Exit plan:** SAGE talks to object storage only through the standard S3 API (endpoint and keys in config, nothing SeaweedFS-specific). Replacing SeaweedFS means a config change and a data copy.
 
 **Trade-offs accepted:** SeaweedFS development is led largely by its creator. There is no LAN web console (MinIO Console is replaced by S3 tools).
+
+## ADR-008: Memory budget — 16 GB Docker VM, a limit on every container
+
+**Date:** 2026-10-02
+**Status:** Accepted (revisit with measurements when Phase 2 lands)
+
+**Context:** Docker Desktop's VM had ~8 GB of the Mac's 48 GB. Measured: containers used ~1.5 GB (individual peaks summed ~2.7 GB) and macOS reported 95% free. The rest of Phase 1 plus the Phase 2 containers (Langfuse with ClickHouse, MLflow, Keycloak, agents) are estimated at 12–14 GB. Language models will run natively on macOS for Metal acceleration, outside the VM.
+
+**Decision:**
+- Docker Desktop memory limit: **16 GB**. This is a ceiling, not a reservation: macOS keeps what containers do not use. It is set in Docker Desktop, not in git (documented in the README).
+- Planned split of 48 GB: ~16 GB Docker VM, ~24 GB native models, ~8 GB macOS.
+- Primary reasoning model: **qwen2.5:32b** (~20 GB at 4-bit). llama3.3:70b (~40 GB at 4-bit) does not fit alongside everything else and is ruled out.
+- Every container has a `mem_limit`, sized from its measured peak plus headroom (128 MB to 1.5 GB, ~9 GB in total).
+- Limits sit above each service's own memory setting so the service's safeguard acts first: Redpanda `--memory 1G` → 1.5 GB; Redis `--maxmemory 512mb` → 768 MB; OTel Collector `memory_limiter` 512 MiB → 768 MB.
+- Jaeger's in-memory trace store is capped (`MEMORY_MAX_TRACES=20000`); it is unbounded by default.
+
+**Verification:** ContainerNearMemoryLimit and DockerVMMemoryHigh are unit-tested with `promtool test rules` (`platform/monitoring/tests/alert-rules.test.yml`). A limit that is too tight causes an OOM kill and restart, which ContainerRestarting reports.
+
+**Trade-offs accepted:** limits are estimates until Phase 2 workloads exist; a wrong one shows up as a restart alert and is corrected in the compose file.

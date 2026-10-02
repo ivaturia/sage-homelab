@@ -2,6 +2,7 @@ services:
   prometheus:
     image: prom/prometheus:v3.11.3
     container_name: prometheus
+    mem_limit: 1g
     restart: always
     ports:
       - "127.0.0.1:9090:9090"   # local only: no login, lifecycle API enabled
@@ -21,6 +22,7 @@ services:
   grafana:
     image: grafana/grafana:13.0.1
     container_name: grafana
+    mem_limit: 768m
     restart: always
     ports:
       - "3000:3000"             # LAN: protected by Grafana login
@@ -43,6 +45,7 @@ services:
   cadvisor:
     image: gcr.io/cadvisor/cadvisor:v0.55.1
     container_name: cadvisor
+    mem_limit: 512m
     restart: always
     ports:
       - "127.0.0.1:8080:8080"
@@ -58,6 +61,7 @@ services:
   loki:
     image: grafana/loki:3.7.1
     container_name: loki
+    mem_limit: 512m
     restart: always
     ports:
       - "127.0.0.1:3100:3100"
@@ -71,6 +75,7 @@ services:
   promtail:
     image: grafana/promtail:3.6.8
     container_name: promtail
+    mem_limit: 256m
     restart: always
     volumes:
       - ./promtail/promtail-config.yml:/etc/promtail/config.yml
@@ -85,17 +90,20 @@ services:
   jaeger:
     image: jaegertracing/all-in-one:1.76.0
     container_name: jaeger
+    mem_limit: 512m
     restart: always
     ports:
       - "127.0.0.1:16686:16686"  # UI only; traces arrive via otel-collector over sage-network
     environment:
       - COLLECTOR_OTLP_ENABLED=true
+      - MEMORY_MAX_TRACES=20000   # in-memory store is unbounded by default
     networks:
       - sage-network
 
   otel-collector:
     image: otel/opentelemetry-collector-contrib:0.151.0
     container_name: otel-collector
+    mem_limit: 768m
     restart: always
     ports:
       - "127.0.0.1:4317:4317"   # OTLP gRPC: the single front door for traces
@@ -110,6 +118,7 @@ services:
   alertmanager:
     image: prom/alertmanager:v0.32.1
     container_name: alertmanager
+    mem_limit: 128m
     restart: always
     ports:
       - "127.0.0.1:9093:9093"   # local only: no login, silences could be set by anyone
