@@ -61,4 +61,6 @@ scrape_configs:
     static_configs:
       - targets: ['sage-redis-exporter:9121']
 
-  # Pending: minio (metrics endpoint requires auth; follow-up)
+  - job_name: 'seaweedfs'
+    static_configs:
+      - targets: ['sage-seaweedfs:9327']   # master, volume, filer and S3 metrics (ADR-007)

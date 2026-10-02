@@ -79,3 +79,28 @@ On macOS, containers run inside Docker Desktop's Linux VM and share only that VM
 **Open question:** Alloy also speaks OTLP natively, so it could replace the OpenTelemetry Collector as well, giving one collection agent instead of two, at the cost of putting all telemetry collection in one component.
 
 **Next step:** Decide scope, migrate, and verify labels in Loki before Phase 2.
+
+## ADR-007: Replace MinIO with SeaweedFS for object storage
+
+**Date:** 2026-10-02
+**Status:** Accepted (supersedes the MinIO parts of ADR-003 and ADR-005)
+
+**Context:** MinIO stopped publishing community images and binaries (October 2025), entered maintenance mode (December 2025) and archived its repository (2026). On 2026-10-02, `docker manifest inspect` confirmed that both `minio/minio:latest` and the release we ran are no longer available on Docker Hub: a fresh clone could not start the infrastructure stack.
+
+**Decision:** SeaweedFS (`chrislusf/seaweedfs:4.48`, Apache-2.0) in single-process mode (`weed server -s3`) is SAGE's S3-compatible object store.
+
+**Reasoning:**
+- Apache-2.0; actively maintained (frequent releases, signed images); adopted by Kubeflow Pipelines as its default object store after MinIO's retreat.
+- Covers what SAGE needs: buckets, upload/download, multipart. Verified with 20 MB round trips (checksums matched) in all three buckets.
+- Native arm64 image; Prometheus metrics on :9327.
+- Considered: Garage (lightweight, AGPL-3.0, fewer S3 features), RustFS (closest to MinIO, still alpha), pgsty/minio (community fork, single maintainer).
+
+**Configuration notes:**
+- `-ip.bind=0.0.0.0` so in-container health checks can reach localhost.
+- `-master.volumeSizeLimitMB=1024` and `-volume.max=0` avoid "no free volumes" on a small node (defaults: 30 GB volumes, 8 slots).
+- S3 keys come from `.env` (`S3_ACCESS_KEY`, `S3_SECRET_KEY`); the S3 identity file is generated at container start because SeaweedFS does not expand env vars.
+- S3 API on `127.0.0.1:8333`; master and filer UIs internal only. Buckets are created by `init-platform.sh` via `weed shell`.
+
+**Exit plan:** SAGE talks to object storage only through the standard S3 API (endpoint and keys in config, nothing SeaweedFS-specific). Replacing SeaweedFS means a config change and a data copy.
+
+**Trade-offs accepted:** SeaweedFS development is led largely by its creator. There is no LAN web console (MinIO Console is replaced by S3 tools).

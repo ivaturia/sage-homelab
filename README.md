@@ -37,7 +37,7 @@ cd sage-homelab
 # 1. Credentials: copy the template and generate a unique password for each service
 cp .env.example .env
 chmod 600 .env
-for var in GRAFANA_ADMIN_PASSWORD POSTGRES_PASSWORD POSTGRES_SAGE_PASSWORD REDIS_PASSWORD MINIO_ROOT_PASSWORD; do
+for var in GRAFANA_ADMIN_PASSWORD POSTGRES_PASSWORD POSTGRES_SAGE_PASSWORD REDIS_PASSWORD S3_ACCESS_KEY S3_SECRET_KEY; do
   sed -i '' "s/^${var}=change-me$/${var}=$(openssl rand -hex 20)/" .env   # macOS sed; on Linux use: sed -i
 done
 
@@ -58,7 +58,7 @@ Always start stacks through `./sage.sh`: it supplies the shared `.env` to every 
 |---|---|---|
 | Grafana | `http://<mac-mini>:3000` | LAN (login) |
 | Portainer | `https://<mac-mini>:9443` | LAN (login, self-signed cert) |
-| MinIO Console | `http://<mac-mini>:9002` | LAN (login) |
+| SeaweedFS S3 API | `http://localhost:8333` | Mac Mini only (access keys) |
 | Prometheus | `http://localhost:9090` | Mac Mini only |
 | Alertmanager | `http://localhost:9093` | Mac Mini only |
 | Jaeger UI | `http://localhost:16686` | Mac Mini only |
@@ -76,7 +76,7 @@ sage-homelab/
 ├── sage.sh                  # up / down / status / logs for all stacks
 ├── .env.example             # credential template (real .env is gitignored)
 ├── docs/                    # Architecture decision records (ADRs)
-├── infrastructure/          # PostgreSQL, Redis, MinIO + exporters
+├── infrastructure/          # PostgreSQL, Redis, SeaweedFS (S3) + exporters
 ├── platform/
 │   ├── monitoring/          # Prometheus, Grafana, Loki, Promtail, Jaeger, OTel Collector, Alertmanager, cAdvisor
 │   ├── redpanda/            # Event bus + console

@@ -1,6 +1,6 @@
 #!/bin/bash
 # SAGE platform initialisation
-# Creates what lives INSIDE volumes (Redpanda topics + settings, MinIO buckets),
+# Creates what lives INSIDE volumes (Redpanda topics + settings, object-storage buckets),
 # so a fresh clone ends up identical to the original.
 # Idempotent: safe to run any number of times. Run after: ./sage.sh up
 set -euo pipefail
@@ -10,6 +10,7 @@ BUCKETS="sage-artifacts sage-datasets sage-archives"
 
 step() { echo -e "\033[0;36m▶ $1\033[0m"; }
 ok()   { echo -e "\033[0;32m  ✔ $1\033[0m"; }
+fail() { echo -e "\033[0;31m✘ $1\033[0m"; exit 1; }
 
 # Wait up to ~60s for a container's healthcheck to report healthy
 wait_healthy() {
@@ -17,13 +18,13 @@ wait_healthy() {
   local tries=30
   until [ "$(docker inspect -f '{{.State.Health.Status}}' "$name" 2>/dev/null)" = "healthy" ]; do
     tries=$((tries - 1))
-    if [ "$tries" -le 0 ]; then
-      echo -e "\033[0;31m✘ $name is not healthy. Is the stack up? (./sage.sh up)\033[0m"
-      exit 1
-    fi
+    [ "$tries" -le 0 ] && fail "$name is not healthy. Is the stack up? (./sage.sh up)"
     sleep 2
   done
 }
+
+# Run one command in SeaweedFS's admin shell (talks to the master; no S3 keys needed)
+weed_shell() { echo "$1" | docker exec -i sage-seaweedfs weed shell 2>/dev/null; }
 
 # ── Redpanda ──────────────────────────────────────────────────────────────────
 step "Redpanda: waiting for broker"
@@ -44,16 +45,26 @@ for t in $TOPICS; do
   fi
 done
 
-# ── MinIO ─────────────────────────────────────────────────────────────────────
-step "MinIO: waiting for server"
-wait_healthy sage-minio
+# ── Object storage (SeaweedFS, ADR-007) ───────────────────────────────────────
+step "SeaweedFS: waiting for server"
+wait_healthy sage-seaweedfs
 
-step "MinIO: buckets"
-# Single quotes: the credentials are expanded INSIDE the container, from its own environment
-docker exec sage-minio sh -c 'mc alias set local http://localhost:9000 "$MINIO_ROOT_USER" "$MINIO_ROOT_PASSWORD" >/dev/null'
+step "SeaweedFS: buckets"
+existing=$(weed_shell "s3.bucket.list")
 for b in $BUCKETS; do
-  docker exec sage-minio mc mb --ignore-existing "local/$b" >/dev/null
-  ok "$b"
+  if echo "$existing" | grep -qE "(^|[[:space:]])$b([[:space:]]|$)"; then
+    ok "$b (exists)"
+  else
+    weed_shell "s3.bucket.create -name $b -owner sage" >/dev/null
+    ok "$b (created)"
+  fi
 done
+
+# weed shell does not always signal failure in its exit code: verify the outcome instead
+final=$(weed_shell "s3.bucket.list")
+for b in $BUCKETS; do
+  echo "$final" | grep -qE "(^|[[:space:]])$b([[:space:]]|$)" || fail "bucket $b is missing after create"
+done
+ok "all buckets verified"
 
 echo -e "\033[0;32m✔ Platform initialised.\033[0m"
