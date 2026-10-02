@@ -113,13 +113,13 @@
             "uid": "eflgvp270kh6oa"
           },
           "editorMode": "code",
-          "expr": "container_memory_usage_bytes{id=~\"/docker/.+\"}",
-          "legendFormat": "__auto",
+          "expr": "max by (name) (container_memory_working_set_bytes{container_label_com_docker_compose_project!=\"\"})",
+          "legendFormat": "{{name}}",
           "range": true,
           "refId": "A"
         }
       ],
-      "title": "Container Memory Usage",
+      "title": "Container Memory (working set)",
       "type": "timeseries"
     },
     {
@@ -178,7 +178,8 @@
                 "value": 80
               }
             ]
-          }
+          },
+          "unit": "percent"
         }
       },
       "gridPos": {
@@ -213,13 +214,13 @@
             "uid": "eflgvp270kh6oa"
           },
           "editorMode": "code",
-          "expr": "rate(container_cpu_usage_seconds_total{id=~\"/docker/.+\"}[5m]) * 100",
-          "legendFormat": "__auto",
+          "expr": "sum by (name) (rate(container_cpu_usage_seconds_total{container_label_com_docker_compose_project!=\"\"}[5m])) * 100",
+          "legendFormat": "{{name}}",
           "range": true,
           "refId": "A"
         }
       ],
-      "title": "Container CPU Usage",
+      "title": "Container CPU (% of one core)",
       "type": "timeseries"
     },
     {
