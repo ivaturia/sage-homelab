@@ -1,7 +1,7 @@
 services:
 
   postgres:
-    image: postgres:16-alpine
+    image: postgres:16.14-alpine
     container_name: sage-postgres
     restart: unless-stopped
     environment:
@@ -25,7 +25,7 @@ services:
       retries: 5
 
   redis:
-    image: redis:7-alpine
+    image: redis:7.4.9-alpine
     container_name: sage-redis
     restart: unless-stopped
     command: >
@@ -72,7 +72,7 @@ services:
       retries: 5
 
   postgres-exporter:
-    image: prometheuscommunity/postgres-exporter:latest
+    image: prometheuscommunity/postgres-exporter:v0.19.1
     container_name: sage-postgres-exporter
     restart: unless-stopped
     environment:
@@ -87,7 +87,7 @@ services:
         condition: service_healthy
 
   redis-exporter:
-    image: oliver006/redis_exporter:latest
+    image: oliver006/redis_exporter:v1.84.0
     container_name: sage-redis-exporter
     restart: unless-stopped
     environment:

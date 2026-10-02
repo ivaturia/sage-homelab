@@ -1,6 +1,6 @@
 services:
   redpanda:
-    image: redpandadata/redpanda:latest
+    image: redpandadata/redpanda:v26.1.9
     container_name: redpanda
     restart: always
     command:
@@ -35,7 +35,7 @@ services:
       retries: 5
 
   redpanda-console:
-    image: redpandadata/console:latest
+    image: redpandadata/console@sha256:72bd99bdc304a7c6aab58bfaccf92e302d4e826f6f4737d14953eb04ceed7c07
     container_name: redpanda-console
     restart: always
     ports:

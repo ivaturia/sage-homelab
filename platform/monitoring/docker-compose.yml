@@ -1,6 +1,6 @@
 services:
   prometheus:
-    image: prom/prometheus:latest
+    image: prom/prometheus:v3.11.3
     container_name: prometheus
     restart: always
     ports:
@@ -19,7 +19,7 @@ services:
       - sage-network
 
   grafana:
-    image: grafana/grafana:latest
+    image: grafana/grafana:13.0.1
     container_name: grafana
     restart: always
     ports:
@@ -41,7 +41,7 @@ services:
       - sage-network
 
   cadvisor:
-    image: gcr.io/cadvisor/cadvisor:latest
+    image: gcr.io/cadvisor/cadvisor:v0.55.1
     container_name: cadvisor
     restart: always
     ports:
@@ -56,7 +56,7 @@ services:
       - sage-network
 
   loki:
-    image: grafana/loki:latest
+    image: grafana/loki:3.7.1
     container_name: loki
     restart: always
     ports:
@@ -69,7 +69,7 @@ services:
       - sage-network
 
   promtail:
-    image: grafana/promtail:latest
+    image: grafana/promtail:3.6.8
     container_name: promtail
     restart: always
     volumes:
@@ -83,7 +83,7 @@ services:
       - sage-network
 
   jaeger:
-    image: jaegertracing/all-in-one:latest
+    image: jaegertracing/all-in-one:1.76.0
     container_name: jaeger
     restart: always
     ports:
@@ -94,7 +94,7 @@ services:
       - sage-network
 
   otel-collector:
-    image: otel/opentelemetry-collector-contrib:latest
+    image: otel/opentelemetry-collector-contrib:0.151.0
     container_name: otel-collector
     restart: always
     ports:
@@ -108,7 +108,7 @@ services:
       - sage-network
 
   alertmanager:
-    image: prom/alertmanager:latest
+    image: prom/alertmanager:v0.32.1
     container_name: alertmanager
     restart: always
     ports:
