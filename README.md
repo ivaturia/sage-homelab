@@ -48,6 +48,7 @@ echo 'https://hooks.slack.com/services/...' > platform/monitoring/alertmanager/s
 # 3. Start everything, then create topics, buckets, and Redpanda settings
 ./sage.sh up
 ./scripts/init-platform.sh
+./scripts/verify.sh            # 26 checks; every one should pass
 ```
 
 Always start stacks through `./sage.sh`: it supplies the shared `.env` to every stack.
